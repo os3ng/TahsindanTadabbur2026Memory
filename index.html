@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tahsin dan Tadabbur 2026 Memory</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="ornament">✦</div>
+    <p class="eyebrow">A collection of moments we shared</p>
+    <h1>Tahsin dan Tadabbur<br><span>2026 Memory</span></h1>
+    <p class="subtitle">Kenangan yang akan sentiasa bersama kita.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#memories">View Memories</a>
+      <a class="btn" href="#upload">Add a Memory</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="memories" class="section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Our memories</p>
+          <h2>Moments worth remembering</h2>
+        </div>
+        <div class="carousel-controls">
+          <button id="prev" aria-label="Previous">←</button>
+          <button id="toggle" aria-label="Pause carousel">Pause</button>
+          <button id="next" aria-label="Next">→</button>
+        </div>
+      </div>
+
+      <div class="carousel-shell">
+        <div class="fade left"></div>
+        <div class="fade right"></div>
+        <div id="carousel" class="carousel" aria-live="polite"></div>
+      </div>
+      <p class="hint">The carousel loops forever. Hover over it to pause.</p>
+    </section>
+
+    <section id="upload" class="section upload-section">
+      <div class="upload-copy">
+        <p class="eyebrow">Add to our story</p>
+        <h2>Upload a memory</h2>
+        <p>Share a photo from Tahsin dan Tadabbur 2026 and write a little story about the moment.</p>
+      </div>
+      <form id="memoryForm" class="memory-form">
+        <label>The POV of this memory is from
+          <input id="name" required maxlength="60" placeholder="e.g. Adam" />
+        </label>
+        <label>Describe what happened <span>(max 220 characters)</span>
+          <textarea id="description" maxlength="220" placeholder="What happened in this moment?"></textarea>
+        </label>
+        <label>Date <span>(optional)</span>
+          <input id="date" type="date" />
+        </label>
+        <label class="file-label">
+          <span>Choose a photo</span>
+          <input id="photo" type="file" accept="image/*" required />
+          <strong id="fileName">No photo selected</strong>
+        </label>
+        <button class="btn primary submit" type="submit">Add Memory</button>
+        <p id="status" class="status"></p>
+      </form>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">All photos</p>
+          <h2>Memory gallery</h2>
+        </div>
+      </div>
+      <div id="gallery" class="gallery"></div>
+    </section>
+  </main>
+
+  <div class="music-player">
+    <button id="musicToggle" aria-label="Mute or play background music">♫</button>
+    <div>
+      <strong>Nostalgic Piano — AtlasAudio</strong>
+      <small id="musicStatus">Soundtrack on</small>
+    </div>
+    <input id="volume" aria-label="Volume" type="range" min="0" max="1" step=".05" value=".35">
+  </div>
+  <audio id="music" src="music.mp3" loop autoplay preload="auto"></audio>
+
+  <footer>
+    <span>✦</span>
+    <p>Tahsin dan Tadabbur 2026</p>
+    <small>May every memory remind us of the knowledge, friendship and moments we shared.</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
