@@ -22,7 +22,26 @@ function card(m,i){
   const removeButton = isMine
     ? `<button class="remove-memory" type="button" data-memory-id="${esc(m.id)}" data-photo-path="${esc(m.photo_path || "")}" aria-label="Delete photo: ${esc(m.name)}" title="Delete your photo"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-10 0 1 14h10l1-14m-7 4v7m4-7v7"/></svg></button>`
     : "";
-  return `<article class="memory-card" style="--tilt:${tilt}deg" data-open-memory="${esc(m.id)}" tabindex="0" role="button" aria-label="Open memory by ${esc(m.name)}">${removeButton}<img src="${esc(m.image)}" alt="${esc(m.description||m.name)}" loading="lazy"><div class="card-meta"><h3>${esc(m.name)}</h3>${m.description?`<p>${esc(m.description)}</p>`:""}${m.date?`<small>${esc(m.date)}</small>`:""}<div class="card-social"><button type="button" class="card-like" data-like-memory="${esc(m.id)}" aria-label="Like memory">♡ <span data-like-count="${esc(m.id)}">0</span></button><span class="comment-hint">💬 <span data-comment-count="${esc(m.id)}">0</span> comments</span></div></div></article>`;
+  return `<article class="memory-card" style="--tilt:${tilt}deg" data-open-memory="${esc(m.id)}">
+    ${removeButton}
+    <img src="${esc(m.image)}" alt="${esc(m.description||m.name)}" loading="lazy">
+    <div class="card-meta">
+      <h3>${esc(m.name)}</h3>
+      ${m.description?`<p>${esc(m.description)}</p>`:""}
+      ${m.date?`<small>${esc(m.date)}</small>`:""}
+      <div class="card-social">
+        <button type="button" class="card-like" data-like-memory="${esc(m.id)}" aria-label="Like memory">♡ <span data-like-count="${esc(m.id)}">0</span></button>
+        <button type="button" class="open-comments-btn" data-open-comments="${esc(m.id)}">💬 <span data-comment-count="${esc(m.id)}">0</span> comments</button>
+      </div>
+      <form class="inline-comment-box" data-inline-comment-form="${esc(m.id)}">
+        <div class="inline-comment-title">Put your comment</div>
+        <input class="inline-comment-name" maxlength="60" required placeholder="Your name">
+        <textarea class="inline-comment-text" maxlength="300" required placeholder="Write a comment..."></textarea>
+        <button class="btn primary inline-comment-submit" type="submit">Post Comment</button>
+        <small class="inline-comment-status" aria-live="polite"></small>
+      </form>
+    </div>
+  </article>`;
 }
 
 function render(){
@@ -367,9 +386,11 @@ function closeMemoryModal(){
 
 document.addEventListener("click",e=>{
   if(e.target.closest("[data-memory-id]") || e.target.closest(".remove-memory"))return;
-  const card=e.target.closest("[data-open-memory]");
-  if(card){
-    openMemoryModal(card.dataset.openMemory).catch(console.error);
+  const commentsBtn=e.target.closest("[data-open-comments]");
+  if(commentsBtn){
+    e.preventDefault();
+    e.stopPropagation();
+    openMemoryModal(commentsBtn.dataset.openComments).catch(console.error);
     return;
   }
   if(e.target.closest("[data-close-modal]"))closeMemoryModal();
@@ -377,11 +398,6 @@ document.addEventListener("click",e=>{
 
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape" && memoryModal && !memoryModal.hidden){closeMemoryModal();return;}
-  const el=document.activeElement;
-  if(el && el.matches && el.matches("[data-open-memory]") && (e.key==="Enter" || e.key===" ")){
-    e.preventDefault();
-    openMemoryModal(el.dataset.openMemory).catch(console.error);
-  }
 });
 
 if(commentForm){
@@ -468,3 +484,75 @@ commentsList?.addEventListener("click",async e=>{
     btn.disabled=false;
   }
 });
+
+
+/* ---------- Always-visible inline comment box ---------- */
+function fillSavedCommentNames(){
+  const savedName=localStorage.getItem("memoryCommentName")||"";
+  if(!savedName)return;
+  document.querySelectorAll(".inline-comment-name").forEach(input=>{
+    if(!input.value) input.value=savedName;
+  });
+}
+
+// Re-fill the remembered name every time cards are rendered.
+const originalRenderForInlineComments=render;
+render=function(){
+  originalRenderForInlineComments();
+  fillSavedCommentNames();
+};
+
+document.addEventListener("submit",async e=>{
+  const inlineForm=e.target.closest("[data-inline-comment-form]");
+  if(!inlineForm)return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const memoryId=inlineForm.dataset.inlineCommentForm;
+  const nameInput=inlineForm.querySelector(".inline-comment-name");
+  const textInput=inlineForm.querySelector(".inline-comment-text");
+  const status=inlineForm.querySelector(".inline-comment-status");
+  const submit=inlineForm.querySelector(".inline-comment-submit");
+  const name=nameInput.value.trim();
+  const text=textInput.value.trim();
+
+  if(!name || !text){
+    status.textContent="Please enter your name and comment.";
+    return;
+  }
+
+  submit.disabled=true;
+  submit.textContent="Posting…";
+  status.textContent="Posting comment…";
+
+  try{
+    await ensureUser();
+    const {error}=await supabaseClient.from("comments").insert({
+      memory_id:memoryId,
+      owner_id:currentUser.id,
+      commenter_name:name,
+      comment_text:text,
+      parent_comment_id:null
+    });
+    if(error)throw error;
+
+    localStorage.setItem("memoryCommentName",name);
+    textInput.value="";
+    status.textContent="Comment posted ✓";
+    await loadSocialSummary();
+
+    // Keep name synchronized across all cards on the page.
+    document.querySelectorAll(".inline-comment-name").forEach(input=>input.value=name);
+  }catch(err){
+    console.error(err);
+    status.textContent=`Comment failed: ${err.message || "Please try again."}`;
+  }finally{
+    submit.disabled=false;
+    submit.textContent="Post Comment";
+  }
+});
+
+// Stop card/delete/like handlers from hijacking typing and form clicks.
+document.addEventListener("click",e=>{
+  if(e.target.closest(".inline-comment-box")) e.stopPropagation();
+},true);

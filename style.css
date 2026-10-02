@@ -252,3 +252,71 @@ footer p{font-family:"Playfair Display",serif;color:var(--ink);font-size:24px;ma
 .comment-action:hover{text-decoration:underline}.comment-action.danger{color:#9b3e36}
 .comment-replies{margin-top:10px;padding-left:14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .comment-reply{background:rgba(247,241,230,.62)}
+
+
+/* ---------- Always-visible comment box on every memory ---------- */
+.inline-comment-box{
+  margin-top:16px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(255,255,255,.58);
+}
+.inline-comment-title{
+  margin-bottom:10px;
+  font-family:"Playfair Display",serif;
+  font-size:19px;
+  font-weight:600;
+  color:var(--ink);
+}
+.inline-comment-box input,
+.inline-comment-box textarea{
+  width:100%;
+  margin:0 0 9px;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+  font:inherit;
+  color:var(--ink);
+}
+.inline-comment-box textarea{
+  min-height:88px;
+  resize:vertical;
+}
+.inline-comment-box input:focus,
+.inline-comment-box textarea:focus{
+  outline:none;
+  border-color:var(--deep);
+  box-shadow:0 0 0 3px rgba(82,107,89,.09);
+}
+.inline-comment-submit{
+  width:100%;
+  min-height:42px;
+}
+.inline-comment-status{
+  display:block;
+  min-height:18px;
+  margin-top:8px;
+  color:var(--deep);
+  font-size:12px;
+}
+.open-comments-btn{
+  border:0;
+  background:transparent;
+  color:var(--deep);
+  font:600 12px "DM Sans",sans-serif;
+  cursor:pointer;
+  padding:4px 0;
+}
+.open-comments-btn:hover{text-decoration:underline}
+.card-social{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.card-like{border:0;background:transparent;color:var(--deep);font:700 13px "DM Sans",sans-serif;cursor:pointer;padding:4px 0}
+.card-like.liked{color:#9b3e36}
+
+/* Make gallery cards comfortable for comments */
+.gallery .inline-comment-box{background:rgba(255,255,255,.7)}
+@media(max-width:520px){
+  .inline-comment-box{padding:13px}
+  .inline-comment-box textarea{min-height:78px}
+}
