@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Tahsin dan Tadabbur 2026 Memory</title>
+  <link rel="stylesheet" href="shell.css">
+</head>
+<body>
+  <div class="shell">
+    <iframe id="contentFrame" title="Tahsin dan Tadabbur memories"></iframe>
+  </div>
+
+  <div class="music-player" aria-label="Background music controls">
+    <button id="musicToggle" class="music-icon" aria-label="Play or mute background music">♫</button>
+    <select id="trackSelect" aria-label="Choose soundtrack"></select>
+    <button id="nextTrack" class="music-next" aria-label="Next soundtrack">›</button>
+    <input id="volume" aria-label="Music volume" type="range" min="0" max="1" step=".05" value=".30">
+    <span id="musicStatus" class="sr-only">Soundtrack on</span>
+  </div>
+  <audio id="music" preload="auto"></audio>
+
+  <script src="shell.js"></script>
+</body>
+</html>
