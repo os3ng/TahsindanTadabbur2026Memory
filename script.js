@@ -1,20 +1,12 @@
-const demo = [
-  {id:"demo-1",owner_id:null,name:"Our Journey",description:"A place for the moments, smiles and lessons we shared together.",date:"Tahsin dan Tadabbur 2026",image:placeholder("Our Journey","✦"),isDemo:true},
-  {id:"demo-2",owner_id:null,name:"Ilmu & Ukhuwah",description:"Every picture carries a small part of our story.",date:"2026",image:placeholder("Ilmu & Ukhuwah","☾"),isDemo:true},
-  {id:"demo-3",owner_id:null,name:"Kenangan Bersama",description:"Upload your own photo below and it will join this carousel automatically.",date:"2026",image:placeholder("Kenangan Bersama","❋"),isDemo:true}
-];
-
-function placeholder(title,symbol){
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1000"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#cbd6c4"/><stop offset="1" stop-color="#efe4d2"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="450" cy="390" r="180" fill="none" stroke="#526b59" opacity=".35" stroke-width="3"/><text x="450" y="420" text-anchor="middle" font-size="120" fill="#526b59">${symbol}</text><text x="450" y="700" text-anchor="middle" font-family="serif" font-size="55" fill="#29372f">${title}</text></svg>`;
-  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
-}
-
 let currentUser = null;
 let uploaded = [];
-let memories = [...demo];
+let memories = [];
 
 const carousel = document.getElementById("carousel");
 const gallery = document.getElementById("gallery");
+const carouselEmpty = document.getElementById("carouselEmpty");
+const galleryEmpty = document.getElementById("galleryEmpty");
+const carouselHint = document.getElementById("carouselHint");
 const form = document.getElementById("memoryForm");
 const photo = document.getElementById("photo");
 const statusEl = document.getElementById("status");
@@ -34,15 +26,29 @@ function card(m,i){
 }
 
 function render(){
-  memories=[...demo,...uploaded];
+  memories=[...uploaded];
+  const hasMemories=memories.length>0;
+  carouselEmpty.hidden=hasMemories;
+  galleryEmpty.hidden=hasMemories;
+  carouselHint.hidden=!hasMemories;
+
+  if(!hasMemories){
+    carousel.innerHTML="";
+    gallery.innerHTML="";
+    x=0;
+    return;
+  }
+
   const set=memories.map((memory,index)=>card(memory,index)).join("");
+  // Duplicate only real uploaded memories to create the seamless infinite track.
   carousel.innerHTML=set+set;
-  gallery.innerHTML=memories.map((memory,index)=>card(memory,index)).join("");
+  gallery.innerHTML=set;
   x=0;
+  carousel.style.transform="translate3d(0,0,0)";
 }
 
 function animate(){
-  if(!paused){
+  if(!paused && memories.length){
     x-=speed;
     const half=carousel.scrollWidth/2;
     if(half>0 && Math.abs(x)>=half) x+=half;
@@ -54,18 +60,15 @@ function animate(){
 carousel.addEventListener("mouseenter",()=>paused=true);
 carousel.addEventListener("mouseleave",()=>paused=false);
 document.getElementById("toggle").onclick=e=>{paused=!paused;e.target.textContent=paused?"Play":"Pause"};
-document.getElementById("prev").onclick=()=>{x+=330};
-document.getElementById("next").onclick=()=>{x-=330};
+document.getElementById("prev").onclick=()=>{if(memories.length)x+=330};
+document.getElementById("next").onclick=()=>{if(memories.length)x-=330};
 
 photo.onchange=()=>document.getElementById("fileName").textContent=photo.files[0]?.name||"No photo selected";
 
 async function ensureUser(){
   const {data:{session},error:sessionError}=await supabaseClient.auth.getSession();
   if(sessionError) throw sessionError;
-  if(session?.user){
-    currentUser=session.user;
-    return currentUser;
-  }
+  if(session?.user){currentUser=session.user;return currentUser;}
   const {data,error}=await supabaseClient.auth.signInAnonymously();
   if(error) throw error;
   currentUser=data.user;
@@ -79,11 +82,7 @@ async function loadMemories({silent=false}={}){
     .select("id, owner_id, name, description, memory_date, photo_path, photo_url, created_at")
     .order("created_at",{ascending:false});
   if(error) throw error;
-  uploaded=(data||[]).map(m=>({
-    ...m,
-    date:m.memory_date || "",
-    image:m.photo_url
-  }));
+  uploaded=(data||[]).map(m=>({...m,date:m.memory_date || "",image:m.photo_url}));
   render();
   if(!silent) statusEl.textContent="";
 }
@@ -97,14 +96,8 @@ form.onsubmit=async e=>{
   e.preventDefault();
   const file=photo.files[0];
   if(!file)return;
-  if(!file.type.startsWith("image/")){
-    statusEl.textContent="Please choose an image file.";
-    return;
-  }
-  if(file.size>4*1024*1024){
-    statusEl.textContent="Please use a photo smaller than 4 MB.";
-    return;
-  }
+  if(!file.type.startsWith("image/")){statusEl.textContent="Please choose an image file.";return;}
+  if(file.size>4*1024*1024){statusEl.textContent="Please use a photo smaller than 4 MB.";return;}
 
   const submitBtn=form.querySelector('button[type="submit"]');
   submitBtn.disabled=true;
@@ -135,15 +128,12 @@ form.onsubmit=async e=>{
     };
 
     const {error:dbError}=await supabaseClient.from("memories").insert(payload);
-    if(dbError){
-      await supabaseClient.storage.from("memories").remove([path]);
-      throw dbError;
-    }
+    if(dbError){await supabaseClient.storage.from("memories").remove([path]);throw dbError;}
 
     form.reset();
     document.getElementById("fileName").textContent="No photo selected";
     await loadMemories({silent:true});
-    statusEl.textContent="Memory added — everyone can now see it!";
+    statusEl.textContent="Memory added — it is now part of the carousel!";
     document.getElementById("memories").scrollIntoView({behavior:"smooth"});
   }catch(err){
     console.error(err);
@@ -169,7 +159,6 @@ async function removeUploadedPhoto(e){
   button.disabled=true;
   statusEl.textContent="Deleting your memory…";
   try{
-    // Storage and database RLS both verify ownership.
     if(photoPath){
       const {error:storageError}=await supabaseClient.storage.from("memories").remove([photoPath]);
       if(storageError) throw storageError;
@@ -177,7 +166,7 @@ async function removeUploadedPhoto(e){
     const {error:dbError}=await supabaseClient.from("memories").delete().eq("id",id);
     if(dbError) throw dbError;
     await loadMemories({silent:true});
-    statusEl.textContent="Memory removed. You can upload a replacement photo anytime.";
+    statusEl.textContent="Memory removed. You can upload the correct photo anytime.";
   }catch(err){
     console.error(err);
     statusEl.textContent=`Delete failed: ${err.message || "Please try again."}`;
@@ -188,20 +177,48 @@ async function removeUploadedPhoto(e){
 gallery.addEventListener("click",removeUploadedPhoto);
 carousel.addEventListener("click",removeUploadedPhoto);
 
-const music=document.getElementById("music"),
-      musicBtn=document.getElementById("musicToggle"),
-      musicStatus=document.getElementById("musicStatus");
-music.volume=.35;
-music.muted=false;
+/* ---------- Compact multi-song playlist ---------- */
+const playlist=[
+  {title:"Nostalgic Piano",artist:"AtlasAudio",src:"music.mp3"},
+  {title:"Hotel Lobby Memories",artist:"Memory Mix",src:"hotel-lobby.mp3"},
+  {title:"Golden Hour Journey",artist:"Memory Mix",src:"golden-hour.mp3"}
+];
+
+const music=document.getElementById("music");
+const musicBtn=document.getElementById("musicToggle");
+const musicStatus=document.getElementById("musicStatus");
+const trackSelect=document.getElementById("trackSelect");
+const nextTrackBtn=document.getElementById("nextTrack");
+const volume=document.getElementById("volume");
+let trackIndex=Number(localStorage.getItem("memoryPlaylistTrack") || 0);
+if(!Number.isInteger(trackIndex) || trackIndex<0 || trackIndex>=playlist.length)trackIndex=0;
+
+playlist.forEach((track,index)=>{
+  const option=document.createElement("option");
+  option.value=String(index);
+  option.textContent=`${track.title} — ${track.artist}`;
+  trackSelect.appendChild(option);
+});
+
+function setTrack(index,{play=false}={}){
+  trackIndex=(index+playlist.length)%playlist.length;
+  const track=playlist[trackIndex];
+  localStorage.setItem("memoryPlaylistTrack",String(trackIndex));
+  trackSelect.value=String(trackIndex);
+  music.src=track.src;
+  music.load();
+  if(play){music.muted=false;music.play().catch(()=>{});}
+  setMusicUI();
+}
 
 function setMusicUI(){
   if(music.muted){musicBtn.textContent="🔇";musicStatus.textContent="Soundtrack muted";}
   else if(music.paused){musicBtn.textContent="♫";musicStatus.textContent="Tap to play soundtrack";}
-  else{musicBtn.textContent="🔊";musicStatus.textContent="Soundtrack on";}
+  else{musicBtn.textContent="🔊";musicStatus.textContent=`Playing ${playlist[trackIndex].title}`;}
 }
 
 async function tryAutoplay(){
-  try{await music.play();setMusicUI();}
+  try{music.muted=false;await music.play();setMusicUI();}
   catch(err){
     musicStatus.textContent="Tap anywhere to start soundtrack";
     musicBtn.textContent="♫";
@@ -215,8 +232,10 @@ async function tryAutoplay(){
   }
 }
 
-document.getElementById("volume").oninput=e=>{
-  music.volume=e.target.value;
+trackSelect.onchange=()=>setTrack(Number(trackSelect.value),{play:true});
+nextTrackBtn.onclick=e=>{e.stopPropagation();setTrack(trackIndex+1,{play:true});};
+volume.oninput=e=>{
+  music.volume=Number(e.target.value);
   music.muted=Number(e.target.value)===0;
   setMusicUI();
 };
@@ -228,7 +247,14 @@ musicBtn.onclick=async e=>{
   setMusicUI();
 };
 
-music.addEventListener("error",()=>{musicStatus.textContent="Soundtrack could not be loaded";});
+// When a track finishes, automatically continue to the next track.
+music.addEventListener("ended",()=>setTrack(trackIndex+1,{play:true}));
+music.addEventListener("play",setMusicUI);
+music.addEventListener("pause",setMusicUI);
+music.addEventListener("error",()=>{musicStatus.textContent="This soundtrack could not be loaded";});
+
+music.volume=.30;
+setTrack(trackIndex);
 window.addEventListener("load",tryAutoplay);
 
 async function startApp(){
@@ -243,7 +269,6 @@ async function startApp(){
     statusEl.textContent=`Could not connect to Supabase: ${err.message || "Check setup.sql and Anonymous Sign-Ins."}`;
   }
 
-  // Refresh quietly every 20 seconds so teammates' new uploads appear without a manual reload.
   setInterval(()=>loadMemories({silent:true}).catch(console.error),20000);
 }
 

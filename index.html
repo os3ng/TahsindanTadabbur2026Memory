@@ -36,8 +36,14 @@
         <div class="fade left"></div>
         <div class="fade right"></div>
         <div id="carousel" class="carousel" aria-live="polite"></div>
+        <div id="carouselEmpty" class="empty-state" hidden>
+          <span>✦</span>
+          <strong>Belum ada memory lagi</strong>
+          <p>Jadi orang pertama yang upload gambar di bawah.</p>
+          <a class="btn" href="#upload">Add the first memory</a>
+        </div>
       </div>
-      <p class="hint">The carousel loops forever. Hover over it to pause.</p>
+      <p id="carouselHint" class="hint">The carousel loops forever. Hover over it to pause.</p>
     </section>
 
     <section id="upload" class="section upload-section">
@@ -74,18 +80,19 @@
         </div>
       </div>
       <div id="gallery" class="gallery"></div>
+      <div id="galleryEmpty" class="gallery-empty" hidden>No photos have been uploaded yet.</div>
     </section>
   </main>
 
-  <div class="music-player">
-    <button id="musicToggle" aria-label="Mute or play background music">♫</button>
-    <div>
-      <strong>Nostalgic Piano — AtlasAudio</strong>
-      <small id="musicStatus">Soundtrack on</small>
-    </div>
-    <input id="volume" aria-label="Volume" type="range" min="0" max="1" step=".05" value=".35">
+  <!-- Compact soundtrack control -->
+  <div class="music-player" aria-label="Background music controls">
+    <button id="musicToggle" class="music-icon" aria-label="Play or mute background music">♫</button>
+    <select id="trackSelect" aria-label="Choose soundtrack"></select>
+    <button id="nextTrack" class="music-next" aria-label="Next soundtrack">›</button>
+    <input id="volume" aria-label="Music volume" type="range" min="0" max="1" step=".05" value=".30">
+    <span id="musicStatus" class="sr-only">Soundtrack on</span>
   </div>
-  <audio id="music" src="music.mp3" loop autoplay preload="auto"></audio>
+  <audio id="music" preload="auto"></audio>
 
   <footer>
     <span>✦</span>
