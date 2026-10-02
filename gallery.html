@@ -9,9 +9,9 @@
 <body>
   <header class="gallery-header">
     <div class="ornament">✦</div>
-    <p class="eyebrow">KOLEKSI KENANGAN KITA BERSAMA</p>
+    <p class="eyebrow">All photos</p>
     <h1>Memory <span>Gallery</span></h1>
-    <p class="subtitle">Kalau kahwin jangan lupa ajak au....</p>
+    <p class="subtitle">Moments worth remembering.</p>
     <div class="hero-actions">
       <a class="btn primary" href="home.html" data-shell-nav="home">Back to Home</a>
       <a class="btn" href="home.html#upload" data-shell-nav="home-upload">Add a Memory</a>
@@ -29,12 +29,47 @@
     <span>✦</span>
     <p>Tahsin dan Tadabbur 2026</p>
     <small>Semoga ukhuwah kita berkekalan hingga ke Jannah &lt;3.</small>
-    <br>
-    <small>Created with ❤️ by os3ng.</small>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="page.js"></script>
+
+  <div id="memoryModal" class="memory-modal" hidden>
+    <div class="memory-modal-backdrop" data-close-modal></div>
+    <div class="memory-modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalMemoryTitle">
+      <button class="memory-modal-close" type="button" data-close-modal aria-label="Close">×</button>
+      <div class="memory-modal-media">
+        <img id="modalMemoryImage" alt="">
+      </div>
+      <div class="memory-modal-content">
+        <div class="memory-modal-head">
+          <h2 id="modalMemoryTitle"></h2>
+          <p id="modalMemoryDescription"></p>
+          <small id="modalMemoryDate"></small>
+        </div>
+        <div class="comments-block">
+          <div class="comments-title-row">
+            <h3>Comments</h3>
+            <span id="commentsCount">0 comments</span>
+          </div>
+          <div id="commentsList" class="comments-list">
+            <p class="comments-empty">No comments yet. Be the first to leave one.</p>
+          </div>
+          <form id="commentForm" class="comment-form">
+            <label>Your name
+              <input id="commentName" maxlength="60" required placeholder="e.g. Abu">
+            </label>
+            <label>Comment
+              <textarea id="commentText" maxlength="300" required placeholder="Tulis komen sikit..."></textarea>
+            </label>
+            <button class="btn primary" type="submit">Post Comment</button>
+            <p id="commentStatus" class="status"></p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
