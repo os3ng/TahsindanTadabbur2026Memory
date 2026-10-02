@@ -22,24 +22,29 @@ function card(m,i){
   const removeButton = isMine
     ? `<button class="remove-memory" type="button" data-memory-id="${esc(m.id)}" data-photo-path="${esc(m.photo_path || "")}" aria-label="Delete photo: ${esc(m.name)}" title="Delete your photo"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-10 0 1 14h10l1-14m-7 4v7m4-7v7"/></svg></button>`
     : "";
-  return `<article class="memory-card" style="--tilt:${tilt}deg" data-open-memory="${esc(m.id)}">
+
+  return `<article class="memory-card" style="--tilt:${tilt}deg">
     ${removeButton}
     <img src="${esc(m.image)}" alt="${esc(m.description||m.name)}" loading="lazy">
     <div class="card-meta">
       <h3>${esc(m.name)}</h3>
       ${m.description?`<p>${esc(m.description)}</p>`:""}
       ${m.date?`<small>${esc(m.date)}</small>`:""}
-      <div class="card-social">
+
+      <div class="card-social compact-social">
         <button type="button" class="card-like" data-like-memory="${esc(m.id)}" aria-label="Like memory">♡ <span data-like-count="${esc(m.id)}">0</span></button>
-        <button type="button" class="open-comments-btn" data-open-comments="${esc(m.id)}">💬 <span data-comment-count="${esc(m.id)}">0</span> comments</button>
+        <span class="comment-count-label">💬 <span data-comment-count="${esc(m.id)}">0</span></span>
       </div>
-      <form class="inline-comment-box" data-inline-comment-form="${esc(m.id)}">
-        <div class="inline-comment-title">Put your comment</div>
-        <input class="inline-comment-name" maxlength="60" required placeholder="Your name">
-        <textarea class="inline-comment-text" maxlength="300" required placeholder="Write a comment..."></textarea>
-        <button class="btn primary inline-comment-submit" type="submit">Post Comment</button>
-        <small class="inline-comment-status" aria-live="polite"></small>
+
+      <div class="direct-comments" data-comments-for="${esc(m.id)}">
+        <p class="direct-comments-empty">No comments yet.</p>
+      </div>
+
+      <form class="quick-comment-form" data-quick-comment="${esc(m.id)}">
+        <input class="quick-comment-input" maxlength="300" required placeholder="Write a comment..." autocomplete="off">
+        <button class="quick-comment-send" type="submit" aria-label="Send comment">➤</button>
       </form>
+      <small class="quick-comment-status" data-comment-status="${esc(m.id)}" aria-live="polite"></small>
     </div>
   </article>`;
 }
@@ -280,279 +285,131 @@ document.addEventListener("click", e=>{
 });
 
 
-/* ---------- Memory comments ---------- */
-const memoryModal=document.getElementById("memoryModal");
-const modalMemoryImage=document.getElementById("modalMemoryImage");
-const modalMemoryTitle=document.getElementById("modalMemoryTitle");
-const modalMemoryDescription=document.getElementById("modalMemoryDescription");
-const modalMemoryDate=document.getElementById("modalMemoryDate");
-const commentsList=document.getElementById("commentsList");
-const commentsCount=document.getElementById("commentsCount");
-const commentForm=document.getElementById("commentForm");
-const commentName=document.getElementById("commentName");
-const commentText=document.getElementById("commentText");
-const commentStatus=document.getElementById("commentStatus");
 
-let activeMemoryId=null;
-let commentsRefreshTimer=null;
-let replyingToCommentId=null;
-let editingCommentId=null;
+/* ---------- Direct comments under each photo ---------- */
+let commentsByMemory={};
 
 function formatCommentTime(value){
   try{
     const d=new Date(value);
-    return d.toLocaleString([], {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    return d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
   }catch(e){return "";}
 }
 
-function renderComments(comments){
-  if(!commentsList)return;
-  commentsCount.textContent=`${comments.length} comment${comments.length===1?"":"s"}`;
-  if(!comments.length){
-    commentsList.innerHTML='<p class="comments-empty">No comments yet. Be the first to leave one.</p>';
-    return;
-  }
-  const byParent=new Map();
-  comments.forEach(c=>{
-    const key=c.parent_comment_id||"root";
-    if(!byParent.has(key))byParent.set(key,[]);
-    byParent.get(key).push(c);
-  });
-  const renderOne=(c,reply=false)=>{
-    const mine=!!currentUser && c.owner_id===currentUser.id;
-    const actions=[];
-    actions.push(`<button type="button" class="comment-action" data-reply-comment="${esc(c.id)}" data-reply-name="${esc(c.commenter_name)}">Reply</button>`);
-    if(mine){
-      actions.push(`<button type="button" class="comment-action" data-edit-comment="${esc(c.id)}">Edit</button>`);
-      actions.push(`<button type="button" class="comment-action danger" data-comment-id="${esc(c.id)}">Delete</button>`);
+function renderDirectComments(memoryId){
+  const comments=commentsByMemory[memoryId]||[];
+  document.querySelectorAll(`[data-comments-for="${CSS.escape(memoryId)}"]`).forEach(box=>{
+    if(!comments.length){
+      box.innerHTML='<p class="direct-comments-empty">No comments yet.</p>';
+      return;
     }
-    const replies=(byParent.get(c.id)||[]).map(r=>renderOne(r,true)).join("");
-    return `<article class="comment-item ${reply?"comment-reply":""}" data-comment-row="${esc(c.id)}">
-      <div class="comment-item-head"><strong>${esc(c.commenter_name)}</strong><small>${esc(formatCommentTime(c.created_at))}</small></div>
-      <p data-comment-text="${esc(c.id)}">${esc(c.comment_text)}</p>
-      <div class="comment-actions">${actions.join("")}</div>
-      ${replies?`<div class="comment-replies">${replies}</div>`:""}
-    </article>`;
-  };
-  commentsList.innerHTML=(byParent.get("root")||[]).map(c=>renderOne(c,false)).join("");
+    box.innerHTML=comments.map(c=>{
+      const mine=!!currentUser && c.owner_id===currentUser.id;
+      return `<div class="direct-comment" data-direct-comment-row="${esc(c.id)}">
+        <div class="direct-comment-bubble">
+          <div class="direct-comment-top">
+            <strong>${mine?"You":"Guest"}</strong>
+            <small>${esc(formatCommentTime(c.created_at))}</small>
+          </div>
+          <p data-direct-comment-text="${esc(c.id)}">${esc(c.comment_text)}</p>
+          ${mine?`<div class="direct-comment-actions"><button type="button" data-edit-direct-comment="${esc(c.id)}" data-memory="${esc(memoryId)}">Edit</button><button type="button" data-delete-direct-comment="${esc(c.id)}" data-memory="${esc(memoryId)}">Delete</button></div>`:""}
+        </div>
+      </div>`;
+    }).join("");
+    box.scrollTop=box.scrollHeight;
+  });
 }
 
-async function loadComments(memoryId,{silent=false}={}){
-  if(!memoryId)return;
-  if(!silent && commentStatus)commentStatus.textContent="Loading comments…";
+async function loadAllComments(){
+  if(!memories.length){commentsByMemory={};return;}
+  const ids=memories.map(m=>m.id);
   const {data,error}=await supabaseClient
     .from("comments")
-    .select("id, memory_id, owner_id, commenter_name, comment_text, parent_comment_id, created_at")
-    .eq("memory_id",memoryId)
+    .select("id,memory_id,owner_id,comment_text,created_at")
+    .in("memory_id",ids)
     .order("created_at",{ascending:true});
-  if(error){
-    if(commentStatus)commentStatus.textContent=`Could not load comments: ${error.message}`;
-    return;
-  }
-  renderComments(data||[]);
-  if(!silent && commentStatus)commentStatus.textContent="";
-}
-
-async function openMemoryModal(memoryId){
-  const memory=uploaded.find(m=>String(m.id)===String(memoryId));
-  if(!memory || !memoryModal)return;
-  activeMemoryId=memory.id;
-  modalMemoryImage.src=memory.image;
-  modalMemoryImage.alt=memory.description||memory.name||"Memory";
-  modalMemoryTitle.textContent=memory.name||"Memory";
-  modalMemoryDescription.textContent=memory.description||"";
-  modalMemoryDate.textContent=memory.date||"";
-  memoryModal.hidden=false;
-  document.body.classList.add("modal-open");
-  await ensureUser();
-  await loadComments(activeMemoryId);
-  clearInterval(commentsRefreshTimer);
-  commentsRefreshTimer=setInterval(()=>{
-    if(activeMemoryId && !memoryModal.hidden){
-      loadComments(activeMemoryId,{silent:true}).catch(console.error);
-    }
-  },10000);
-}
-
-function closeMemoryModal(){
-  if(!memoryModal)return;
-  memoryModal.hidden=true;
-  document.body.classList.remove("modal-open");
-  activeMemoryId=null;
-  clearInterval(commentsRefreshTimer);
-  commentsRefreshTimer=null;
-  if(commentStatus)commentStatus.textContent="";
-}
-
-document.addEventListener("click",e=>{
-  if(e.target.closest("[data-memory-id]") || e.target.closest(".remove-memory"))return;
-  const commentsBtn=e.target.closest("[data-open-comments]");
-  if(commentsBtn){
-    e.preventDefault();
-    e.stopPropagation();
-    openMemoryModal(commentsBtn.dataset.openComments).catch(console.error);
-    return;
-  }
-  if(e.target.closest("[data-close-modal]"))closeMemoryModal();
-});
-
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape" && memoryModal && !memoryModal.hidden){closeMemoryModal();return;}
-});
-
-if(commentForm){
-  const savedName=localStorage.getItem("memoryCommentName");
-  if(savedName) commentName.value=savedName;
-  commentForm.addEventListener("submit",async e=>{
-    e.preventDefault();
-    if(!activeMemoryId)return;
-    const name=commentName.value.trim();
-    const text=commentText.value.trim();
-    if(!name || !text){ commentStatus.textContent="Please fill in your name and comment."; return; }
-    const btn=commentForm.querySelector('button[type="submit"]');
-    btn.disabled=true; btn.textContent="Posting…";
-    commentStatus.textContent=editingCommentId?"Saving comment…":"Posting comment…";
-    try{
-      await ensureUser();
-      let error=null;
-      if(editingCommentId){
-        ({error}=await supabaseClient.from("comments").update({comment_text:text}).eq("id",editingCommentId));
-      }else{
-        ({error}=await supabaseClient.from("comments").insert({
-          memory_id:activeMemoryId,
-          owner_id:currentUser.id,
-          commenter_name:name,
-          comment_text:text,
-          parent_comment_id:replyingToCommentId
-        }));
-      }
-      if(error) throw error;
-      commentText.value="";
-      replyingToCommentId=null;
-      editingCommentId=null;
-      btn.textContent="Post Comment";
-      localStorage.setItem("memoryCommentName",name);
-      await loadComments(activeMemoryId,{silent:true});
-      await loadSocialSummary().catch(console.error);
-      commentStatus.textContent=editingCommentId?"Comment updated.":"Comment posted.";
-    }catch(err){
-      console.error(err);
-      commentStatus.textContent=`Comment failed: ${err.message || "Please try again."}`;
-    }finally{
-      btn.disabled=false; btn.textContent="Post Comment";
-    }
+  if(error){console.error("Could not load comments",error);return;}
+  commentsByMemory={};
+  ids.forEach(id=>commentsByMemory[id]=[]);
+  (data||[]).forEach(c=>{
+    if(!commentsByMemory[c.memory_id])commentsByMemory[c.memory_id]=[];
+    commentsByMemory[c.memory_id].push(c);
+  });
+  ids.forEach(id=>{
+    document.querySelectorAll(`[data-comment-count="${CSS.escape(id)}"]`).forEach(el=>el.textContent=(commentsByMemory[id]||[]).length);
+    renderDirectComments(id);
   });
 }
 
-commentsList?.addEventListener("click",async e=>{
-  const replyBtn=e.target.closest("[data-reply-comment]");
-  if(replyBtn){
-    replyingToCommentId=replyBtn.dataset.replyComment;
-    editingCommentId=null;
-    commentText.value="";
-    commentText.placeholder=`Reply to ${replyBtn.dataset.replyName}...`;
-    commentText.focus();
-    commentStatus.textContent=`Replying to ${replyBtn.dataset.replyName}`;
-    return;
-  }
-
-  const editBtn=e.target.closest("[data-edit-comment]");
-  if(editBtn){
-    editingCommentId=editBtn.dataset.editComment;
-    replyingToCommentId=null;
-    const textEl=commentsList.querySelector(`[data-comment-text="${CSS.escape(editingCommentId)}"]`);
-    commentText.value=textEl?.textContent||"";
-    commentText.placeholder="Edit your comment...";
-    commentText.focus();
-    commentStatus.textContent="Editing your comment";
-    commentForm.querySelector('button[type="submit"]').textContent="Save Edit";
-    return;
-  }
-
-  const btn=e.target.closest("[data-comment-id]");
-  if(!btn)return;
-  if(!confirm("Delete your comment?"))return;
-  btn.disabled=true;
-  try{
-    const {error}=await supabaseClient.from("comments").delete().eq("id",btn.dataset.commentId);
-    if(error) throw error;
-    await loadComments(activeMemoryId,{silent:true});
-    await loadSocialSummary().catch(console.error);
-  }catch(err){
-    console.error(err);
-    commentStatus.textContent=`Delete failed: ${err.message || "Please try again."}`;
-    btn.disabled=false;
-  }
-});
-
-
-/* ---------- Always-visible inline comment box ---------- */
-function fillSavedCommentNames(){
-  const savedName=localStorage.getItem("memoryCommentName")||"";
-  if(!savedName)return;
-  document.querySelectorAll(".inline-comment-name").forEach(input=>{
-    if(!input.value) input.value=savedName;
-  });
-}
-
-// Re-fill the remembered name every time cards are rendered.
-const originalRenderForInlineComments=render;
-render=function(){
-  originalRenderForInlineComments();
-  fillSavedCommentNames();
+// Extend social summary so likes + visible comments refresh together.
+const originalLoadSocialSummaryDirect=loadSocialSummary;
+loadSocialSummary=async function(){
+  await originalLoadSocialSummaryDirect();
+  await loadAllComments();
 };
 
 document.addEventListener("submit",async e=>{
-  const inlineForm=e.target.closest("[data-inline-comment-form]");
-  if(!inlineForm)return;
+  const form=e.target.closest("[data-quick-comment]");
+  if(!form)return;
   e.preventDefault();
   e.stopPropagation();
 
-  const memoryId=inlineForm.dataset.inlineCommentForm;
-  const nameInput=inlineForm.querySelector(".inline-comment-name");
-  const textInput=inlineForm.querySelector(".inline-comment-text");
-  const status=inlineForm.querySelector(".inline-comment-status");
-  const submit=inlineForm.querySelector(".inline-comment-submit");
-  const name=nameInput.value.trim();
-  const text=textInput.value.trim();
+  const memoryId=form.dataset.quickComment;
+  const input=form.querySelector(".quick-comment-input");
+  const send=form.querySelector(".quick-comment-send");
+  const status=form.parentElement.querySelector(`[data-comment-status="${CSS.escape(memoryId)}"]`);
+  const text=input.value.trim();
+  if(!text)return;
 
-  if(!name || !text){
-    status.textContent="Please enter your name and comment.";
-    return;
-  }
-
-  submit.disabled=true;
-  submit.textContent="Posting…";
-  status.textContent="Posting comment…";
-
+  send.disabled=true;
+  if(status)status.textContent="Sending...";
   try{
     await ensureUser();
     const {error}=await supabaseClient.from("comments").insert({
       memory_id:memoryId,
       owner_id:currentUser.id,
-      commenter_name:name,
-      comment_text:text,
-      parent_comment_id:null
+      commenter_name:"Guest",
+      comment_text:text
     });
     if(error)throw error;
-
-    localStorage.setItem("memoryCommentName",name);
-    textInput.value="";
-    status.textContent="Comment posted ✓";
-    await loadSocialSummary();
-
-    // Keep name synchronized across all cards on the page.
-    document.querySelectorAll(".inline-comment-name").forEach(input=>input.value=name);
+    input.value="";
+    if(status)status.textContent="";
+    await loadAllComments();
   }catch(err){
     console.error(err);
-    status.textContent=`Comment failed: ${err.message || "Please try again."}`;
+    if(status)status.textContent=`Comment failed: ${err.message||"Please try again."}`;
   }finally{
-    submit.disabled=false;
-    submit.textContent="Post Comment";
+    send.disabled=false;
   }
 });
 
-// Stop card/delete/like handlers from hijacking typing and form clicks.
-document.addEventListener("click",e=>{
-  if(e.target.closest(".inline-comment-box")) e.stopPropagation();
-},true);
+document.addEventListener("click",async e=>{
+  const edit=e.target.closest("[data-edit-direct-comment]");
+  if(edit){
+    e.preventDefault(); e.stopPropagation();
+    const id=edit.dataset.editDirectComment;
+    const memoryId=edit.dataset.memory;
+    const textEl=document.querySelector(`[data-direct-comment-text="${CSS.escape(id)}"]`);
+    const current=textEl?.textContent||"";
+    const next=prompt("Edit your comment:",current);
+    if(next===null)return;
+    const clean=next.trim();
+    if(!clean)return;
+    const {error}=await supabaseClient.from("comments").update({comment_text:clean}).eq("id",id);
+    if(error){alert("Could not edit comment: "+error.message);return;}
+    await loadAllComments();
+    return;
+  }
+
+  const del=e.target.closest("[data-delete-direct-comment]");
+  if(del){
+    e.preventDefault(); e.stopPropagation();
+    if(!confirm("Delete your comment?"))return;
+    const {error}=await supabaseClient.from("comments").delete().eq("id",del.dataset.deleteDirectComment);
+    if(error){alert("Could not delete comment: "+error.message);return;}
+    await loadAllComments();
+  }
+});
+
+// Refresh visible comments for other people's new posts.
+setInterval(()=>loadAllComments().catch(console.error),10000);
