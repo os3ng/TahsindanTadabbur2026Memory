@@ -128,7 +128,7 @@ if(form) form.onsubmit=async e=>{
   const file=photo.files[0];
   if(!file)return;
   if(!file.type.startsWith("image/")){statusEl.textContent="Please choose an image file.";return;}
-  if(file.size>4*1024*1024){statusEl.textContent="Please use a photo smaller than 4 MB.";return;}
+  if(file.size>5*1024*1024){statusEl.textContent="Please use a photo smaller than 5 MB.";return;}
 
   const submitBtn=form.querySelector('button[type="submit"]');
   submitBtn.disabled=true;
